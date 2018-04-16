@@ -2,14 +2,14 @@ package main
 
 import (
 	"flag"
-	"strings"
-	"strconv"
-	"github.com/gorilla/mux"
-	"net/http"
 	"fmt"
 	"github.com/bingoohuang/go-utils"
-	"log"
 	"github.com/go-redis/redis"
+	"github.com/gorilla/mux"
+	"log"
+	"net/http"
+	"strconv"
+	"strings"
 )
 
 var (
