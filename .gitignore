@@ -15,4 +15,4 @@
 .idea
 vendor
 bindata.go
-go-yoga-proxy
+go-yoga-proxy*

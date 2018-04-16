@@ -38,6 +38,7 @@ func main() {
 	r := mux.NewRouter()
 
 	handleFunc(r, "/clearCache", clearCache, false)
+	handleFunc(r, "/getCache", getCache, false)
 	http.Handle("/", r)
 
 	fmt.Println("start to listen at ", port)
@@ -55,6 +56,17 @@ func handleFunc(r *mux.Router, path string, f func(http.ResponseWriter, *http.Re
 	}
 
 	r.HandleFunc(contextPath+path, wrap)
+}
+
+func getCache(w http.ResponseWriter, r *http.Request) {
+	key := strings.TrimSpace(r.FormValue("key"))
+
+	val, err := getRedisContent(key)
+	if err != nil {
+		http.Error(w, err.Error(), 405)
+	}
+
+	w.Write([]byte(val))
 }
 
 func clearCache(w http.ResponseWriter, r *http.Request) {
@@ -124,6 +136,13 @@ func newRedisClient(server RedisServer) *redis.Client {
 		Password: server.Password,  // no password set
 		DB:       server.DefaultDb, // use default DB
 	})
+}
+
+func getRedisContent(key string) (string, error) {
+	client := newRedisClient(redisServer)
+	defer client.Close()
+
+	return client.Get(key).Result()
 }
 
 func deleteMultiKeys(keys []string) error {
