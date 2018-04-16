@@ -58,10 +58,10 @@ func handleFunc(r *mux.Router, path string, f func(http.ResponseWriter, *http.Re
 }
 
 func clearCache(w http.ResponseWriter, r *http.Request) {
-	key := strings.TrimSpace(r.FormValue("key"))
-	log.Println("clear cache for key:", key)
+	keys := strings.TrimSpace(r.FormValue("keys"))
+	log.Println("clear cache for keys:", keys)
 
-	err := deleteMultiKeys(key)
+	err := deleteMultiKeys(strings.Split(keys, ","))
 	if err != nil {
 		http.Error(w, err.Error(), 405)
 	}
@@ -126,7 +126,7 @@ func newRedisClient(server RedisServer) *redis.Client {
 	})
 }
 
-func deleteMultiKeys(keys ...string) error {
+func deleteMultiKeys(keys []string) error {
 	client := newRedisClient(redisServer)
 	defer client.Close()
 
