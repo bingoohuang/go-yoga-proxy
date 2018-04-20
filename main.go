@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -39,6 +40,7 @@ func main() {
 
 	handleFunc(r, "/clearCache", clearCache, false)
 	handleFunc(r, "/getCache", getCache, false)
+	handleFunc(r, "/setCache", setCache, false)
 	http.Handle("/", r)
 
 	fmt.Println("start to listen at ", port)
@@ -58,12 +60,31 @@ func handleFunc(r *mux.Router, path string, f func(http.ResponseWriter, *http.Re
 	r.HandleFunc(contextPath+path, wrap)
 }
 
+func setCache(w http.ResponseWriter, r *http.Request) {
+	key := strings.TrimSpace(r.FormValue("key"))
+	value := strings.TrimSpace(r.FormValue("value"))
+	ttl := strings.TrimSpace(r.FormValue("ttl"))
+
+	val, err := setRedisContent(key, value, ttl)
+	if err != nil {
+		http.Error(w, err.Error(), 405)
+		return
+	}
+	w.Write([]byte(val))
+}
+
 func getCache(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimSpace(r.FormValue("key"))
 
 	val, err := getRedisContent(key)
+	if err == redis.Nil {
+		w.Write([]byte(""))
+		return
+	}
+
 	if err != nil {
 		http.Error(w, err.Error(), 405)
+		return
 	}
 
 	w.Write([]byte(val))
@@ -76,6 +97,7 @@ func clearCache(w http.ResponseWriter, r *http.Request) {
 	err := deleteMultiKeys(strings.Split(keys, ","))
 	if err != nil {
 		http.Error(w, err.Error(), 405)
+		return
 	}
 
 	w.Write([]byte("OK"))
@@ -143,6 +165,18 @@ func getRedisContent(key string) (string, error) {
 	defer client.Close()
 
 	return client.Get(key).Result()
+}
+
+func setRedisContent(key, value, ttl string) (string, error) {
+	client := newRedisClient(redisServer)
+	defer client.Close()
+
+	duration, err := time.ParseDuration(ttl)
+	if err != nil {
+		return "", err
+	}
+
+	return client.Set(key, value, duration).Result()
 }
 
 func deleteMultiKeys(keys []string) error {
