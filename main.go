@@ -94,13 +94,13 @@ func clearCache(w http.ResponseWriter, r *http.Request) {
 	keys := strings.TrimSpace(r.FormValue("keys"))
 	log.Println("clear cache for keys:", keys)
 
-	err := deleteMultiKeys(strings.Split(keys, ","))
+	result, err := deleteMultiKeys(strings.Split(keys, ","))
 	if err != nil {
 		http.Error(w, err.Error(), 405)
 		return
 	}
 
-	w.Write([]byte("OK"))
+	w.Write([]byte(strconv.FormatInt(result, 10)))
 }
 
 type RedisServer struct {
@@ -179,10 +179,9 @@ func setRedisContent(key, value, ttl string) (string, error) {
 	return client.Set(key, value, duration).Result()
 }
 
-func deleteMultiKeys(keys []string) error {
+func deleteMultiKeys(keys []string) (int64, error) {
 	client := newRedisClient(redisServer)
 	defer client.Close()
 
-	_, err := client.Del(keys...).Result()
-	return err
+	return client.Del(keys...).Result()
 }
