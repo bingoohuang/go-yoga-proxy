@@ -21,7 +21,7 @@ var (
 
 func init() {
 	contextPathArg := flag.String("contextPath", "", "context path")
-	redisAddrArg := flag.String("redisAddr", "127.0.0.1:6379", "context path")
+	redisAddrArg := flag.String("redisAddr", "127.0.0.1:6379", "redis server addr")
 	portArg := flag.Int("port", 8082, "Port to serve.")
 
 	flag.Parse()
@@ -41,6 +41,7 @@ func main() {
 	handleFunc(r, "/clearCache", clearCache, false)
 	handleFunc(r, "/getCache", getCache, false)
 	handleFunc(r, "/setCache", setCache, false)
+	handleFunc(r, "/zaddCache", zaddCache, false)
 	http.Handle("/", r)
 
 	fmt.Println("start to listen at ", port)
@@ -58,6 +59,20 @@ func handleFunc(r *mux.Router, path string, f func(http.ResponseWriter, *http.Re
 	}
 
 	r.HandleFunc(contextPath+path, wrap)
+}
+
+func zaddCache(w http.ResponseWriter, r *http.Request) {
+	key := strings.TrimSpace(r.FormValue("key"))
+	value := strings.TrimSpace(r.FormValue("value"))
+	score := strings.TrimSpace(r.FormValue("score"))
+
+	i, err := zaddRedisContent(key, value, score)
+	if err != nil {
+		http.Error(w, err.Error(), 405)
+		return
+	}
+
+	w.Write([]byte(strconv.FormatInt(i, 10)))
 }
 
 func setCache(w http.ResponseWriter, r *http.Request) {
@@ -165,6 +180,21 @@ func getRedisContent(key string) (string, error) {
 	defer client.Close()
 
 	return client.Get(key).Result()
+}
+
+func zaddRedisContent(key, value, score string) (int64, error) {
+	client := newRedisClient(redisServer)
+	defer client.Close()
+
+	f, e := strconv.ParseFloat(score, 64)
+	if e != nil {
+		return 0, e
+	}
+
+	return client.ZAdd(key, redis.Z{
+		Score:  f,
+		Member: value,
+	}).Result()
 }
 
 func setRedisContent(key, value, ttl string) (string, error) {
