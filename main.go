@@ -65,8 +65,9 @@ func zaddCache(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimSpace(r.FormValue("key"))
 	value := strings.TrimSpace(r.FormValue("value"))
 	score := strings.TrimSpace(r.FormValue("score"))
+	db, _ := strconv.Atoi(go_utils.EmptyThen(r.FormValue("db"), "0"))
 
-	i, err := zaddRedisContent(key, value, score)
+	i, err := zaddRedisContent(key, value, score, db)
 	if err != nil {
 		http.Error(w, err.Error(), 405)
 		return
@@ -79,8 +80,9 @@ func setCache(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimSpace(r.FormValue("key"))
 	value := strings.TrimSpace(r.FormValue("value"))
 	ttl := strings.TrimSpace(r.FormValue("ttl"))
+	db, _ := strconv.Atoi(go_utils.EmptyThen(r.FormValue("db"), "0"))
 
-	val, err := setRedisContent(key, value, ttl)
+	val, err := setRedisContent(key, value, ttl, db)
 	if err != nil {
 		http.Error(w, err.Error(), 405)
 		return
@@ -90,8 +92,9 @@ func setCache(w http.ResponseWriter, r *http.Request) {
 
 func getCache(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimSpace(r.FormValue("key"))
+	db, _ := strconv.Atoi(go_utils.EmptyThen(r.FormValue("db"), "0"))
 
-	val, err := getRedisContent(key)
+	val, err := getRedisContent(key, db)
 	if err == redis.Nil {
 		w.Write([]byte(""))
 		return
@@ -107,9 +110,11 @@ func getCache(w http.ResponseWriter, r *http.Request) {
 
 func clearCache(w http.ResponseWriter, r *http.Request) {
 	keys := strings.TrimSpace(r.FormValue("keys"))
+	db, _ := strconv.Atoi(go_utils.EmptyThen(r.FormValue("db"), "0"))
+
 	log.Println("clear cache for keys:", keys)
 
-	result, err := deleteMultiKeys(strings.Split(keys, ","))
+	result, err := deleteMultiKeys(strings.Split(keys, ","), db)
 	if err != nil {
 		http.Error(w, err.Error(), 405)
 		return
@@ -167,23 +172,23 @@ func parseServerItem(serverConfig string) RedisServer {
 	}
 }
 
-func newRedisClient(server RedisServer) *redis.Client {
+func newRedisClientToDb(server RedisServer, db int) *redis.Client {
 	return redis.NewClient(&redis.Options{
 		Addr:     server.Addr,
-		Password: server.Password,  // no password set
-		DB:       server.DefaultDb, // use default DB
+		Password: server.Password, // no password set
+		DB:       db,
 	})
 }
 
-func getRedisContent(key string) (string, error) {
-	client := newRedisClient(redisServer)
+func getRedisContent(key string, db int) (string, error) {
+	client := newRedisClientToDb(redisServer, db)
 	defer client.Close()
 
 	return client.Get(key).Result()
 }
 
-func zaddRedisContent(key, value, score string) (int64, error) {
-	client := newRedisClient(redisServer)
+func zaddRedisContent(key, value, score string, db int) (int64, error) {
+	client := newRedisClientToDb(redisServer, db)
 	defer client.Close()
 
 	f, e := strconv.ParseFloat(score, 64)
@@ -197,8 +202,8 @@ func zaddRedisContent(key, value, score string) (int64, error) {
 	}).Result()
 }
 
-func setRedisContent(key, value, ttl string) (string, error) {
-	client := newRedisClient(redisServer)
+func setRedisContent(key, value, ttl string, db int) (string, error) {
+	client := newRedisClientToDb(redisServer, db)
 	defer client.Close()
 
 	duration, err := time.ParseDuration(ttl)
@@ -209,8 +214,8 @@ func setRedisContent(key, value, ttl string) (string, error) {
 	return client.Set(key, value, duration).Result()
 }
 
-func deleteMultiKeys(keys []string) (int64, error) {
-	client := newRedisClient(redisServer)
+func deleteMultiKeys(keys []string, db int) (int64, error) {
+	client := newRedisClientToDb(redisServer, db)
 	defer client.Close()
 
 	return client.Del(keys...).Result()
